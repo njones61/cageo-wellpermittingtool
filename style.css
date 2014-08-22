@@ -1,0 +1,175 @@
+
+
+      html, body 	{
+        		  height: 100%; width: 100%; margin: 0; padding: 0;
+      			}
+
+      body		{
+        		  overflow:hidden;margin: 0; padding: 0;
+        		  font-family: "Georgia";
+			  background: white;
+      			}
+
+
+
+      #headerpane	{
+			 padding-bottom: 0px;
+			 padding-top: 2px;
+			 xfont-variant:small-caps;
+			 color:black;
+			 font-size:16pt;
+			 text-align:center;
+
+      			}
+
+      #bodypane		{
+			 padding-top: 0px;
+      			}
+
+      #leftPane		{
+      			  margin: 5px;
+      			  padding:2px;
+      			  color:#3f3f3f;
+      			  border: solid 0px #224a54;
+      			  width:32%;
+			  max-width: 400px;
+			  min-width: 250px;
+     			}
+
+      #mapArea		{
+      			  background-color: black;
+      			  border:solid 4px black;
+      			  -moz-border-radius: 3px;
+			  margin-right:2px;
+      			}
+
+
+      #footer 		{
+      			  margin: 2px;
+      			  border: solid 0px #224a54;
+      			  font-size:10pt; text-align:center; height:10px;
+      			}
+
+      .dijitTabInnerDiv	{
+      			  background-color:#ecefe4;
+      			}
+
+      #tabs		{
+      			  padding:3px;
+      			}
+
+
+
+      .sidecontentsub	{
+			  color:black; font-family:Georgia; font-size:10pt; border:solid 0px grey; padding:0px; line-height:22pt;
+			}
+
+
+
+      .inputText	{
+			  color:navy; 
+			}
+
+      input		{
+			  color:navy; 
+			}
+
+      .mssgButton	{
+			  border:0px; background-color:white; color:grey; font-family:Georgia; border:0; color:grey;
+			}
+
+      .mssgButtonLink	{
+			  border:0px; background-color:white; color:white; font-family:Georgia; border:0; 
+			  color:blue; text-decoration:none;  cursor:pointer;
+			}
+
+      .TitleLabel	{
+			  color:black; line-height:30pt;
+			}
+
+
+
+.myTitlePane  .dijitTitlePaneTitle {
+  border: 0px solid #b5bcc7;
+  padding: 0 0px 0px 0px;
+  min-height: 17px;
+  padding-left: 2px;
+
+  background-color: none;
+  background:none;
+}
+.myTitlePane .dijitTitlePaneTitleHover {
+  color:#0033cc;
+}
+.myTitlePane .dijitTitlePaneContentOuter {
+  background: #ffffff;
+  border: 0px solid #b5bcc7;
+  border-top: none;
+  margin-bottom: 4px;
+}
+.myTitlePane .dijitTitlePaneContentInner {
+  padding: 0px;
+  padding-left: 8px;
+  padding-bottom: 5px;
+  margin-left:5px;
+  border-left: 1px dotted black;
+}
+
+
+
+.ResultsTitlePane .dijitTitlePaneContentInner {
+  padding: 0px;
+  padding-left: 8px;
+  padding-bottom: 5px;
+}
+.ResultsTitlePane  .dijitTitlePaneTitle {
+  border: 0px solid #b5bcc7;
+  padding: 0 0px 0px 0px;
+  min-height: 17px;
+  padding-left: 2px;
+  margin-bottom: 0px;
+  background-color: #fdf2e3;
+  border-left: 1px solid #fde6c9;
+}
+.ResultsTitlePane .dijitTitlePaneContentOuter {
+  background: #ffffff;
+  border: 0px solid #fde6c9;
+  border-top: none;
+  border-left: 1px solid #fde6c9;
+}
+.ResultsTitlePane .dijitTitlePaneTitleHover {
+  background-color: #facc93;
+}
+
+
+.myButton {
+  border: 0px solid #b5bcc7;
+  margin: 4px 4px 4px 4px;
+  background-color: #fdf2e3;
+
+} 
+.myButton :hover {
+  background-color: #facc93;
+  color: #000000;
+}
+
+
+      #table_databaseWells	{
+			 	  border-collapse:collapse; width:100%; font-family: times; font-size: larger;
+				}
+
+      tr.databaseWells 		{
+				  border: solid 1px grey; background-color:white; align:center; padding:2px;
+				}
+
+      tr.databaseWells > td 	{
+				  text-align:center; padding:3px;
+				}
+
+      tr.databaseWells:hover 	{
+				  border: solid 1px grey; background-color:lightgrey; 
+				}
+
+      tr.databaseWells > th 	{
+				  border: solid 1px grey; background-color:lightgrey; 
+				}

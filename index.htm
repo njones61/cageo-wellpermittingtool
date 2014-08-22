@@ -1,0 +1,1364 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+<html>
+ 
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+    <!--The viewport meta tag is used to improve the presentation and behavior of the samples on iOS devices-->
+    <meta name="viewport" content="initial-scale=1, maximum-scale=1,user-scalable=no"/>
+
+    <title>Well Permitting Tool</title>
+
+       <!-- Dojo Style -->
+    <link rel="stylesheet" type="text/css" href="http://ajax.googleapis.com/ajax/libs/dojo/1.6/dijit/themes/claro/claro.css">
+
+       <!-- Custom Style -->
+    <link rel="stylesheet" type="text/css"  href = "style.css"/>
+
+      <!-- Dojo Javascript Framework -->
+    <script src="http://ajax.googleapis.com/ajax/libs/dojo/1.6/dojo/dojo.xd.js" djConfig="parseOnLoad: true"></script>
+
+      <!-- Google Earth API -->
+    <script type="text/javascript" src="https://www.google.com/jsapi?key=ABQIAAAAl3u1styJiQvpAWj9FaOURBS6aSiABBr6ZlZoWLJzmLB-yDmbfBR-6mCW6NZYgPZ_AfzaL5FNhGGbew"> </script>
+
+      <!-- adds the database well table, and allows user to modify it -->
+    <script type="text/javascript" src="tableView.js"></script>
+
+
+
+<script type="text/javascript">
+
+  dojo.require("dojo.data.ItemFileReadStore");
+  dojo.require("dijit.dijit"); 
+  dojo.require("dijit.form.ComboBox");			
+  dojo.require("dijit.form.Form");
+  dojo.require("dijit.form.CheckBox");
+  dojo.require("dijit.form.Slider");
+  dojo.require("dijit.form.Form");
+  dojo.require("dijit.form.Button");
+  dojo.require("dijit.form.TextBox");
+  dojo.require("dijit.form.ComboBox");
+  dojo.require("dijit.layout.BorderContainer");
+  dojo.require("dijit.layout.ContentPane");
+  dojo.require("dijit.layout.TabContainer");
+  dojo.require("dijit.layout.AccordionContainer");
+  dojo.require("dijit.layout.StackContainer");
+  dojo.require("dijit.Dialog");
+  dojo.require("dijit.TitlePane");
+  dojo.require("dijit.form.Select");
+
+
+  var ge;
+  var gex;
+  google.load("earth", "1");
+  var dojoLoaded = false;
+  var googleLoaded = false;
+
+  //var allDatabaseWells, kml_modflowWells, kml_modflowGrid, kml_moflowHK1, kml_moflowHK2, kml_moflowHK3, kml_moflowHK4;// the modflow kml layers
+  //var UDWR_areas, UDWR_pod, UDWR_pls; 
+
+  var kml_GPLayerArr = new Array();  									// stores result kml or kmz layers from the GP tool
+
+
+  // After Dojo API has loaded, set some things up:
+  dojo.addOnLoad(function() {
+
+    dojoLoaded = true;
+    init();
+
+    // Set up "Table View" tab
+    populateTable();
+
+
+  });
+
+
+  // After Google Earth API has loaded, allow for the map to be set up:
+  google.setOnLoadCallback(function() {	
+    googleLoaded = true;
+    init();
+  });
+
+
+  function init() {
+   /*
+    *  After both apis load, create a new earth instance:
+    */
+
+    if(dojoLoaded  && googleLoaded)
+      google.earth.createInstance('map3d', initCB, failureCB);
+
+    // otherwise wait for both dojo and google to load; init() is called after dojo loads and also after google loads
+
+  }
+
+
+
+  function initCB(instance) { 
+   /*
+    *   When the earth instance has been created sussesfully:
+    */
+
+    ge = instance;
+    ge.getWindow().setVisibility(true);
+
+
+    //  Pan the map to North Utah Valley:
+    var initialView = ge.createLookAt('');
+    initialView.setLatitude(    40.333317 );
+    initialView.setLongitude( -111.745285 );
+    initialView.setRange(    20000.0  ); 
+    ge.getView().setAbstractView(initialView);
+
+
+
+    // Add google earth controls and layers:
+    ge.getTime().setHistoricalImageryEnabled(true); 				// make the historical imagery tool available
+    ge.getTime().getControl().setVisibility(ge.VISIBILITY_HIDE);		// this will be switched to visible after the earth zooms into view (see 2 lines down)
+    ge.getNavigationControl().setStreetViewEnabled( true );			// adds capability to view street view images
+    setTimeout('updateLayerVisabilityGE()', 1000);  				// without this delay, the function would cause startup-crashing in Firefox
+
+
+
+    // Create a Google Earth Folder object to organize the canidate well placemarks that will be added to the map
+    IdWellsFolder = ge.createFolder('');
+    ge.getFeatures().appendChild( IdWellsFolder );
+
+
+
+
+    // Add kml files to the map:
+    kml_modflowST1 = addKmlFromUrl('http://utahdwr.groups.et.byu.net/kml/MODFLOW/Starting Head/sh1.kml');
+    kml_modflowST2 = addKmlFromUrl('http://utahdwr.groups.et.byu.net/kml/MODFLOW/Starting Head/sh2.kml');
+    kml_modflowST3 = addKmlFromUrl('http://utahdwr.groups.et.byu.net/kml/MODFLOW/Starting Head/sh3.kml');
+    kml_modflowST4 = addKmlFromUrl('http://utahdwr.groups.et.byu.net/kml/MODFLOW/Starting Head/sh4.kml');
+	
+    kml_modflowHK1 = addKmlFromUrl('http://utahdwr.groups.et.byu.net/kml/MODFLOW/HK/HK1.kml');
+    kml_modflowHK2 = addKmlFromUrl('http://utahdwr.groups.et.byu.net/kml/MODFLOW/HK/HK2.kml');
+    kml_modflowHK3 = addKmlFromUrl('http://utahdwr.groups.et.byu.net/kml/MODFLOW/HK/HK3.kml');
+    kml_modflowHK4 = addKmlFromUrl('http://utahdwr.groups.et.byu.net/kml/MODFLOW/HK/HK4.kml');
+	
+	kml_modflowKV12 = addKmlFromUrl('http://utahdwr.groups.et.byu.net/kml/MODFLOW/HK/KV12.kml');
+    kml_modflowKV23 = addKmlFromUrl('http://utahdwr.groups.et.byu.net/kml/MODFLOW/HK/KV23.kml');
+    kml_modflowKV34 = addKmlFromUrl('http://utahdwr.groups.et.byu.net/kml/MODFLOW/HK/KV34.kml');
+	
+	kml_modflowGrid = addKmlFromUrl('http://utahdwr.groups.et.byu.net/kml/MODFLOW/Active/GridFeatures2.kmz');
+	kml_modflowGrid2 = addKmlFromUrl('http://utahdwr.groups.et.byu.net/kml/MODFLOW/Active/grid2.kml');
+	kml_modflowBound = addKmlFromUrl('http://utahdwr.groups.et.byu.net/kml/MODFLOW/Active/ActivePerimeter.kml');
+	
+    kml_modflowWells1 = addKmlFromUrl('http://utahdwr.groups.et.byu.net/kml/MODFLOW/Wells/Wells1.kmz');	
+	kml_modflowWells2 = addKmlFromUrl('http://utahdwr.groups.et.byu.net/kml/MODFLOW/Wells/Wells2.kmz');
+	kml_modflowWells3 = addKmlFromUrl('http://utahdwr.groups.et.byu.net/kml/MODFLOW/Wells/Wells3.kmz');
+	kml_modflowWells4 = addKmlFromUrl('http://utahdwr.groups.et.byu.net/kml/MODFLOW/Wells/Wells4.kmz');
+	
+	kml_modflowCH = addKmlFromUrl('http://utahdwr.groups.et.byu.net/kml/MODFLOW/Constant Head/ConstantHead.kmz');
+	kml_modflowGH = addKmlFromUrl('http://utahdwr.groups.et.byu.net/kml/MODFLOW/General Head/GeneralHead.kmz');
+	
+	kml_modflowDrains1 = addKmlFromUrl('http://utahdwr.groups.et.byu.net/kml/MODFLOW/Drains/drains1.kmz');	
+	kml_modflowDrains2 = addKmlFromUrl('http://utahdwr.groups.et.byu.net/kml/MODFLOW/Drains/drains2.kmz');
+	kml_modflowDrains3 = addKmlFromUrl('http://utahdwr.groups.et.byu.net/kml/MODFLOW/Drains/drains3.kmz');
+	
+	kml_modflowDrainCond1= addKmlFromUrl('http://utahdwr.groups.et.byu.net/kml/MODFLOW/Drains/DrainCond1.kmz');
+	kml_modflowDrainCond2= addKmlFromUrl('http://utahdwr.groups.et.byu.net/kml/MODFLOW/Drains/DrainCond2.kmz');
+	kml_modflowDrainCond3= addKmlFromUrl('http://utahdwr.groups.et.byu.net/kml/MODFLOW/Drains/DrainCond3.kmz');
+	
+	kml_modflowStreams1 = addKmlFromUrl('http://utahdwr.groups.et.byu.net/kml/MODFLOW/Streams/Streams1.kmz');
+	
+	kml_modflowET1 = addKmlFromUrl('http://utahdwr.groups.et.byu.net/kml/MODFLOW/ET/et1.kmz');
+	
+	kml_modflowRch1 = addKmlFromUrl('http://utahdwr.groups.et.byu.net/kml/MODFLOW/Recharge/recharge1.kmz');//
+	
+	
+	
+    UDWR_areas = addKmlFromUrl('http://utahdwr.groups.et.byu.net/kml/WaterRightAreas.kml');
+    UDWR_pod = addKmlFromUrl('http://utahdwr.groups.et.byu.net/kml/wrpod.kml');
+    UDWR_pls = addKmlFromUrl('http://utahdwr.groups.et.byu.net/kml/plss.kml');
+    updateLayerVisabilityMOD();
+    updateLayerVis();
+
+	
+  }
+
+
+  function failureCB(errorCode) {
+   /*
+    *   If the earth instance has failed to be created sussesfully
+    */
+
+  }
+
+// -----------------------------------------------------------------------------------------
+// Functions to toggle kml and kmz layer visibility
+//
+
+  function updateLayerVisabilityGE() {
+   /*
+    *   Display or hide Google Earth Map components and layers depending on checkbox values:
+    */
+
+    // Enable or disable Standard Earth Layers:
+    ge.getLayerRoot().enableLayerById(ge.LAYER_BORDERS, dojo.byId("GE_borders").checked  );
+    ge.getLayerRoot().enableLayerById(ge.LAYER_ROADS, dojo.byId("GE_roads").checked );
+    ge.getLayerRoot().enableLayerById(ge.LAYER_TERRAIN, dojo.byId("GE_elev").checked );
+
+    // Enable or disable Standard Earth Components:
+    ge.getOptions().setStatusBarVisibility( dojo.byId("GE_status").checked );
+    ge.getOptions().setScaleLegendVisibility( dojo.byId("GE_scale").checked );
+	
+    // Enable or disable Navigation Toolbar
+    if ( dojo.byId("GE_nav").checked )
+      ge.getNavigationControl().setVisibility(ge.VISIBILITY_AUTO);
+    else
+      ge.getNavigationControl().setVisibility(ge.VISIBILITY_HIDE);
+    
+    // Enable or disable Time toolbar
+    if ( dojo.byId("GE_time").checked )
+      ge.getTime().getControl().setVisibility(ge.VISIBILITY_SHOW);
+    else
+      ge.getTime().getControl().setVisibility(ge.VISIBILITY_HIDE);
+
+
+  }
+
+  
+  function updateLayerVisabilityMOD() {
+   /*
+    *   Display or hide kml files depicting MODFLOW Model elements depending on checkbox values
+	*	Order is important: 
+	*	 - points are always atop image overlays
+	*	 - layer more recently changed from hidden to visible are shown on top of the less recently toggled layers
+    */	
+
+	var k  = dijit.byId("MOD_k").value;
+
+	// Update the Starting Head Overlays...
+	var strtHd = dijit.byId("MOD_startingHead").checked;
+    kml_modflowST1.setVisibility( (strtHd==true) && (k=="1" || k=="All") );
+    kml_modflowST2.setVisibility( (strtHd==true) && (k=="2" || k=="All") );
+    kml_modflowST3.setVisibility( (strtHd==true) && (k=="3" || k=="All") );
+    kml_modflowST4.setVisibility( (strtHd==true) && (k=="4" || k=="All") );
+	
+	
+	// Update the Hydraulic Condictivity Overlays...
+	var hk = dijit.byId("MOD_hk").checked;
+    kml_modflowHK1.setVisibility( (hk==true) && (k=="1" || k=="All") );
+    kml_modflowHK2.setVisibility( (hk==true) && (k=="2" || k=="All") );
+    kml_modflowHK3.setVisibility( (hk==true) && (k=="3" || k=="All") );
+    kml_modflowHK4.setVisibility( (hk==true) && (k=="4" || k=="All") );
+	
+	// Update the Vertical Condictivity Overlays...
+	var kv = dijit.byId("MOD_kv").checked;
+    kml_modflowKV12.setVisibility( (kv==true) && (k=="2" || k=="All") );
+    kml_modflowKV23.setVisibility( (kv==true) && (k=="3" || k=="All") );
+    kml_modflowKV34.setVisibility( (kv==true) && (k=="4" || k=="All") );
+	
+	// Update the Grid Overlays... To ensure this layer appears above the 
+	//  conductivity images, we have to toggle the display off and then 
+	//  back on
+	kml_modflowGrid.setVisibility( dijit.byId("MOD_grid").checked );
+	kml_modflowGrid2.setVisibility( false ); 
+	kml_modflowGrid2.setVisibility( dijit.byId("MOD_grid2").checked );
+	
+	// Update the Grid Boundry
+	kml_modflowBound.setVisibility( dijit.byId("MOD_bound").checked );
+	
+	// Update the Wells...
+	var wells = dijit.byId("MOD_wells").checked;
+	kml_modflowWells1.setVisibility( (wells==true) && (k=="1" || k=="All") );
+	kml_modflowWells2.setVisibility( (wells==true) && (k=="2" || k=="All") );
+	kml_modflowWells3.setVisibility( (wells==true) && (k=="3" || k=="All") );
+	kml_modflowWells4.setVisibility( (wells==true) && (k=="4" || k=="All") );
+	
+	// Update the Drains...
+	var drains = dijit.byId("MOD_drains").checked;
+	kml_modflowDrains1.setVisibility( (drains==true) && (k=="1" || k=="All") );
+	kml_modflowDrains2.setVisibility( (drains==true) && (k=="2" || k=="All") );
+	kml_modflowDrains3.setVisibility( (drains==true) && (k=="3" || k=="All") );
+	
+	
+	var drainCond = dijit.byId("MOD_drainCond").checked;
+	kml_modflowDrainCond1.setVisibility( (drainCond==true) && (k=="1" || k=="All") );
+	kml_modflowDrainCond2.setVisibility( (drainCond==true) && (k=="2" || k=="All") );
+	kml_modflowDrainCond3.setVisibility( (drainCond==true) && (k=="3" || k=="All") );
+	
+	
+	// Update the Streams...
+	var streams = dijit.byId("MOD_streams").checked;
+	kml_modflowStreams1.setVisibility( (streams==true) && (k=="1" || k=="All") );
+	
+	// Update the ET...
+	var et = dijit.byId("MOD_et").checked;
+	kml_modflowET1.setVisibility( (et==true) && (k=="1" || k=="All") );
+	
+
+	// Update the Recharge...
+	var recharge = dijit.byId("MOD_recharge").checked;
+	kml_modflowRch1.setVisibility( (recharge==true) && (k=="1" || k=="All") );
+	
+	// Update the General Head and Constant Head...
+	var gh = dijit.byId("MOD_gh").checked;
+	kml_modflowGH.setVisibility( (gh==true) && (k=="1" || k=="All") );
+	var ch = dijit.byId("MOD_ch").checked;
+	kml_modflowCH.setVisibility( (ch==true) && (k=="1" || k=="All") );
+	
+	
+	
+    // also update these layers:
+    // allDatabaseWells.setVisibility( dojo.byId("wpt_all").checked );
+    IdWellsFolder.setVisibility( dojo.byId("wpt_id").checked );
+
+  }
+
+  function updateLayerVis(){
+
+    UDWR_areas.setVisibility( dojo.byId("UDWR_areas").checked );
+    UDWR_pls.setVisibility( dojo.byId("UDWR_pls").checked );
+    UDWR_pod.setVisibility( dojo.byId("UDWR_pod").checked );
+
+}
+
+
+  function updateOpacityMOD(){
+ 
+    // Update the Starting Head Overlays...
+    var opacity = dijit.byId("startingHeadSlider").value;
+	kml_modflowST1.setOpacity(opacity);
+	kml_modflowST2.setOpacity(opacity);
+	kml_modflowST3.setOpacity(opacity);
+	kml_modflowST4.setOpacity(opacity);
+	
+    // Update the Hydraulic Condictivity Overlays...
+    var opacity = dijit.byId("hkSlider").value;
+	kml_modflowHK1.setOpacity(opacity);
+	kml_modflowHK2.setOpacity(opacity);
+	kml_modflowHK3.setOpacity(opacity);
+	kml_modflowHK4.setOpacity(opacity);
+  
+  	// Update the Vertical Condictivity Overlays...
+	var opacity = dijit.byId("kvSlider").value;
+	kml_modflowKV12.setOpacity(opacity);
+	kml_modflowKV23.setOpacity(opacity);
+	kml_modflowKV34.setOpacity(opacity);
+	
+  	// Update the Grid Overlays...
+	var opacity = dijit.byId("gridSlider").value;
+	kml_modflowGrid.setOpacity(opacity);
+	
+
+  }
+
+// -----------------------------------------------------------------------------------------
+// Adding KMZ files:
+//
+
+
+
+  function addKmlFromUrl(kmlUrl) {
+   /*
+    *   Add a kml network link to the map
+    *   initCB() utilizes this function to add several kml files, some containing network links
+    *   KmlGPLayer() also utilizes this function
+    */
+
+    var link = ge.createLink('');
+    link.setHref(kmlUrl);
+
+    var networkLink = ge.createNetworkLink('');
+    networkLink.setLink(link);
+
+    ge.getFeatures().appendChild(networkLink);
+    return networkLink;
+	
+  }
+
+
+// -----------------------------------------------------------------------------------------
+// 
+//
+
+
+  var IdWellsFolder;  // place all the placemarks for wells from the database in this folder
+
+  function importWellsFromDB(){
+
+    // only add well placemarks if the google earth plugin has loaded
+    if(dojoLoaded  && googleLoaded){
+
+      //clear previously added database-well placemarks
+      var oldFeatures = IdWellsFolder.getFeatures();
+      while (oldFeatures.getFirstChild())
+        oldFeatures.removeChild(oldFeatures.getFirstChild());
+
+
+      idvalue = dojo.byId("importWellsTxtbx").value;
+
+      dojo.xhrGet({
+        url: "php/getWellsByApplicationID_json.php",
+        content: {id: idvalue },
+        handleAs: "json",		// automatically converts the json string to a json object 
+
+        load: function(result) {
+
+          var data = result.data;
+
+
+          for(var i=0; i<data.length; i++){
+
+
+            var placemark = ge.createPlacemark(""); //dbWell" + data[i].Well_ID); 
+            placemark.setName("" + data[i].Well_ID);  
+            IdWellsFolder.getFeatures().appendChild(placemark);
+
+            // Create style map for placemark
+            var icon = ge.createIcon('');
+            icon.setHref('http://maps.google.com/mapfiles/kml/shapes/placemark_square.png');
+            //icon.setHref('http://maps.google.com/mapfiles/kml/paddle/red-circle.png');
+            //icon.setHref('http://utahdwr.groups.et.byu.net/app/icons/newwell.png');
+            //icon.setHref('http://maps.google.com/mapfiles/kml/shapes/placemark_circle.png');
+
+            var style = ge.createStyle('');
+            style.getIconStyle().setIcon(icon);
+	    style.getIconStyle().setScale(1.0);
+		  
+            placemark.setStyleSelector(style);
+		  
+
+            // Create point
+            var point = ge.createPoint('');
+            point.setLatitude( data[i].Latitude*1 );
+            point.setLongitude( data[i].Longitude*1 );
+            placemark.setGeometry( point );
+	  
+ 
+
+            // Create the description that will display in an info-balloon upon clicking on the placemark
+            var desc = ""
+                   + "<table><tbody>"
+                   + "<tr><td>Well_ID:</td><td> " + data[i].Well_ID + "</td></tr>"
+                   + "<tr><td>Latitude:</td><td> " + data[i].Latitude + "</td></tr>"
+                   + "<tr><td>Longitude:</td><td> " + data[i].Longitude + "</td></tr>"
+                   + "<tr><td>Flow_cfd:</td><td> " + data[i].Flow_cfd + "</td></tr>"
+                   + "<tr><td>ScreenTopElev_ft:</td><td> " + data[i].ScreenTopElev_ft + "</td></tr>"
+                   + "<tr><td>ScreenBotmElev_ft:</td><td> " + data[i].ScreenBotmElev_ft + "</td></tr>"
+                   + "<tr><td>ApplicationID:</td><td> " + data[i].ApplicationID + "</td></tr>"
+                   + "</tbody></table>";
+
+
+            placemark.setDescription(desc);
+
+
+          }
+        },
+        error: function(result){
+
+          // if there is a problem, tell us about it
+          alert(result);
+
+        }
+
+      });  
+
+    }
+
+  }
+
+
+  function refreshDBWellsKML(){
+
+    if (dojo.byId("wpt_all").checked){
+
+      try{
+        ge.getFeatures().removeChild( allDatabaseWells );
+      }catch(e){}
+      google.earth.fetchKml(ge, 'http://utahdwr.groups.et.byu.net/app/php/getWells_kml.php', function(kmlObject) {
+        if (kmlObject)
+          allDatabaseWells = ge.getFeatures().appendChild(kmlObject);
+      });
+
+    }
+
+    allDatabaseWells.setVisibility( dojo.byId("wpt_all").checked );
+
+  }
+
+
+// ----------------------------------------------------------------------------------------------------------------------------
+
+
+  // Where to run the tool and where to get the results:
+  runToolUrl           = "http://utahdwr.groups.et.byu.net/app4/php/_RunGPTool.php";
+  messagesUrl          = "http://utahdwr.groups.et.byu.net/app4/php/_GetGPMessages.php";
+  var timeout;
+
+  function runTool(){
+
+    applicationID = dojo.byId("importWellsTxtbx").value;
+    contourInterval = dojo.byId("contourInterval_1").value;
+    OutputWells =  dojo.byId("OutputWells").checked;            // Note that the 'checked' rather than 'value' attribute is used for chackboxes
+    OutputDrawdown = dojo.byId("OutputDrawdown").checked;       //  This returns a string, "true" or "false", rather than "on" or "off"
+    OutputDrainPoints = dojo.byId("OutputDrainPoints").checked; // 
+    OutputDrainAreas = dojo.byId("OutputDrainAreas").checked;   // 
+	OutputReport = dojo.byId("OutputReport").checked;
+
+    content = {"applicationID":applicationID , 
+               "contourInterval":contourInterval,
+               "OutputWells":OutputWells,
+               "OutputDrawdown":OutputDrawdown,
+               "OutputDrainPoints":OutputDrainPoints,
+               "OutputDrainAreas":OutputDrainAreas,
+			   "OutputReport":OutputReport
+               };
+
+    var d = new Date();
+    //startTime = d.getHours() + ":" + d.getMinutes() + ":" + d.getSeconds();
+
+    jobId = "id" +d.getHours()+ d.getMinutes() + d.getSeconds() + applicationID;
+
+
+    // Add new div...
+
+    // Open the results Pane
+    dijit.byId("ResultsPane").set('open', true);
+
+
+    // find the sibling element where the new job label will be attached next to (Dojo adds a buch of <div> elements within the widget container div) 
+    brotherDIV = dojo.byId('ResultLayersDIV_Anchor');
+
+    // create and add the 'general div container' (to hold all the information about this particular job)
+    newItem = dojo.create( "div", {innerHTML: "", id: "job_" + jobId } );
+ 
+    // add a title 
+    title = dojo.create( "i", {innerHTML: "Sending request to the server...", id: "title_" + jobId}, newItem,  "last" );	
+
+    // add a div to hold the result checkboxes, and a link to view the messages
+    newItemResults = dojo.create( "div", {innerHTML: "", id: "results_" + jobId }, newItem,  "last" );
+
+    // add a div to hold the result checkboxes, and a link to view the messages
+    newItemResultsMessages = dojo.create( "div", {innerHTML: "", id: "resultsMessages_" + jobId });
+
+    // add a link to job messages.  The innerHTML will be empty untill the tool completes and the link is ready
+    linkToMessages = dojo.create( "a", { href: "javascript:void(0)", innerHTML: "", id: "linkdiv_" + jobId}, newItemResults ,  "last" );	
+
+    // this div is not added to the display, but just stores the messages
+    holderDIV = dojo.create( "div", {innerHTML: ""}, brotherDIV, "after"  );
+
+    var tp = new dijit.TitlePane({title: "Results for Application ID = " + applicationID, content: newItem, id: "tp_" + jobId, class:"myTitlePane"});
+    holderDIV.appendChild(tp.domNode);
+
+	
+    dojo.xhrGet({
+      url: runToolUrl,
+      content: content,
+      handle: function ( messages ){     // regardless of whether the call completes or fails... 
+        setTimeout("clearTimeout(timeout)", 2000); // stop checking for message updates, but wait for the last check to complete.
+      },
+      load: function( messages ) {
+
+        dojo.html.set(newItemResultsMessages , messages )
+        dojo.html.set(linkToMessages , "View Detailed Geoprocessing Messages" )
+
+        dojo.connect(linkToMessages, "onclick", function(){ 
+
+
+          messageDlg = new dijit.Dialog({
+            title: "Geoprocessing Messages",
+            style: "font-size:smaller; font-family:arial;"
+          });
+          messageDlg.set("content", messages);
+          messageDlg.show();
+
+
+        }, true)
+
+
+      },
+      error: function(e) {
+        alert(" Error. " + e);
+        //dojo.html.set(newItem, "Error! " +e);
+      }
+    });
+
+
+	
+    //Start checking the result file for status updates and results
+    setTimeout("updateStatus(jobId, 0) ", 1000 );
+
+  }
+ 
+
+
+
+
+  function updateStatus(jobId, startingIndex){  
+  
+  
+    dojo.xhrGet({
+      url: messagesUrl,
+      load: function( messages ) {
+    
+	    
+        kmlResultCode = "KML RESULTS"; 
+		htmlResultCode = "HTML RESULTS"; 
+		messageCode = "STATUS"; 
+		endCode = "END"; 
+		
+		// only look at new results that haven't been added already
+        newLines = messages.substring(startingIndex);
+        newStartingIndex = messages.length;
+		
+        // Check again in 2 seconds
+        timeout = setTimeout("updateStatus('"+jobId+"', "+ newStartingIndex +")", 2000 );
+				
+		// iterate through each line of the results file
+        while ( newLines.length > 0 ){  
+		
+		  // get the text for a single line
+		  line = newLines;
+		  if ( newLines.indexOf("\n") > 0 )
+		    line = line.substring( 0, line.indexOf("\n") );
+			
+		  lineData = line.split(',');
+
+		  // check if the current line has kml results
+		  if ( lineData[0] == kmlResultCode )
+		  {
+		  
+            var layerName = lineData[1];
+            var layerContents = lineData[2];
+            var layerUrl = lineData[3];
+
+			// Add results to the map
+            addKmzResultLinkedToCheckbox(dojo.byId("results_"+jobId), layerUrl, layerName, layerContents );
+		  
+          }
+		  else if( lineData[0] == htmlResultCode)
+		  {
+			// Add html
+		    layerContents  = lineData[2];
+			addHtmlResult( dojo.byId("results_"+jobId), layerContents ); 
+			
+			dojo.html.set('title_'+jobId, lineData[1] );
+		  }
+		  else if( lineData[0] == messageCode )
+		  {
+			message = lineData[1];
+            dojo.html.set('title_'+jobId, message );
+		  }
+		  else if( lineData[0] == endCode )
+		  {
+		    // Update the Status to display the end message (success or failure)
+			endMessage = lineData[1];
+            dojo.html.set('title_'+jobId, endMessage );
+		  
+		  }
+		  
+		  // set the newLines variable for the next loop iteration
+		  newLines = newLines.substring( line.length + 1 )
+		  
+        }
+
+
+      },
+      error: function(e) {
+        dojo.html.set('title_'+jobId, "Error checking status... \n");
+      }
+    })
+
+
+  }
+  function addHtmlResult(div, content){
+
+      dojo.create( "div", { innerHTML: content , style:{borderLeft: "25px solid #eeeeee", paddingLeft: "4px" } }, div );
+
+  }
+
+  function addKmzResultLinkedToCheckbox(div, url, name, content){
+  // div is the div element to add the textbox to
+  // url is the path to the kmz file
+  // name is the text to display as the checkbox label
+
+
+      // The id and kmz url both need to be unique so several drawdown layers can exist
+      uniqueId = name + Math.random();
+      var checkboxId = "cb_" + uniqueId ;
+
+
+
+      // Add a table to organize/format the new checkbox and titlepane
+      table = dojo.create( "table", { innerHTML: "" , style:{maxWidth:"100%"} , cellspacing:"0px", cellpaddin: "0px"}, div );
+      tbody = dojo.create( "tbody", { innerHTML: "" , style:{width:"100%"} }, table );
+      row =   dojo.create( "tr", { innerHTML: ""}, tbody );
+      cellCheckbox = dojo.create( "td", { innerHTML: "", style:{verticalAlign:"top", paddingTop:"3px"} }, row );
+      cellTitle = dojo.create( "td", { innerHTML: "", style:{verticalAlign:"top", width:"100%"} }, row );
+
+
+      // Add a checkbox to enable show/hide functionality of result layers
+      var checkbox = dojo.create( "input", {id: checkboxId, type: "checkbox", checked:"true"}, cellCheckbox );
+
+
+      // Add a custom title pane to show the layer name and legend
+      //var lableSpan = dojo.create( "div", { innerHTML: name, id: "l_"+uniqueId }, cellTitle, "last"  );
+      ResultItem = dojo.create( "div", {innerHTML: "45"}, cellTitle );
+      ResultContent = new dijit.TitlePane({title: name , content:content, class:"myTitlePane", open:false}, ResultItem );
+
+
+      // Add it to the map...
+      newNetworkLink = addKmlFromUrl(url);
+      kml_GPLayerArr.push(newNetworkLink);
+
+      // Create a fancy checkbox that will toggle the kmz layer visibility
+      var checkBoxD = new dijit.form.CheckBox({
+        name: checkboxId,
+        value: kml_GPLayerArr.length,			// used to identify the layer (3 lines down)
+        checked: true,
+        onChange: function(bool) {
+          kml_GPLayerArr[parseInt(this.value) - 1 ].setVisibility( bool );
+        }
+      }, checkboxId);
+
+
+  }
+
+
+// ------------------------------------------
+// 
+// the following 'test' functions are only for development testing
+// 
+// ------------------------------------------
+  function loadLPrevResults(titleStr, MessagesUrl)
+  {
+    var d = new Date();
+    jobId = "id" +d.getHours()+ d.getMinutes() + d.getSeconds() + "prev";
+
+    // Add new div...
+
+    // Open the results Pane
+    dijit.byId("ResultsPane").set('open', true);
+
+    // find the sibling element where the new job label will be attached next to (Dojo adds a buch of <div> elements within the widget container div) 
+    brotherDIV = dojo.byId('ResultLayersDIV_Anchor');
+
+    // create and add the 'general div container' (to hold all the information about this particular job)
+    newItem = dojo.create( "div", {innerHTML: "", id: "job_" + jobId } );
+ 
+    // add a title 
+    title = dojo.create( "i", {innerHTML: "Sending request to the server...", id: "title_" + jobId}, newItem,  "last" );	
+
+    // add a div to hold the result checkboxes, and a link to view the messages
+    newItemResults = dojo.create( "div", {innerHTML: "", id: "results_" + jobId }, newItem,  "last" );
+
+    // add a div to hold the result checkboxes, and a link to view the messages
+    newItemResultsMessages = dojo.create( "div", {innerHTML: "", id: "resultsMessages_" + jobId });
+
+    // add a link to job messages.  The innerHTML will be empty untill the tool completes and the link is ready
+    linkToMessages = dojo.create( "a", { href: "javascript:void(0)", innerHTML: "", id: "linkdiv_" + jobId}, newItemResults ,  "last" );	
+
+    // this div is not added to the display, but just stores the messages
+    holderDIV = dojo.create( "div", {innerHTML: ""}, brotherDIV, "after"  );
+
+    var tp = new dijit.TitlePane({title: titleStr, content: newItem, id: "tp_" + jobId, class:"myTitlePane"});
+    holderDIV.appendChild(tp.domNode);
+  
+
+    //"Sample Output/messages.txt"
+    //Start updating the Status div
+    dojo.xhrGet({
+      url: MessagesUrl,
+      load: function( messages ) {
+
+        kmlResultCode = "KML RESULTS"; 
+		htmlResultCode = "HTML RESULTS"; 
+		endCode = "END"; 
+		
+        newLines = messages;
+
+		// iterate through each line of the results file
+        while ( newLines.length > 0 ){  
+		
+		  // get the text for a single line
+		  line = newLines;
+		  if ( newLines.indexOf("\n") > 0 )
+		    line = line.substring( 0, line.indexOf("\n") );
+			
+		  lineData = line.split(',');
+
+		  // check if the current line has kml results
+		  if ( lineData[0] == kmlResultCode )
+		  {
+		  
+            var layerName = lineData[1];
+            var layerContents = lineData[2];
+            var layerUrl = lineData[3];
+
+			// Add results to the map
+            addKmzResultLinkedToCheckbox(dojo.byId("results_"+jobId), layerUrl, layerName, layerContents );
+          }
+		  else if( lineData[0] == htmlResultCode)
+		  {
+			// Add html
+		    layerContents  = lineData[2];
+			addHtmlResult( dojo.byId("results_"+jobId), layerContents ); 
+			
+			dojo.html.set('title_'+jobId, lineData[1] );
+		  }
+		  else if( lineData[0] == endCode )
+		  {
+		    // Update the Status to display the end message (success or failure)
+			endMessage = lineData[1];
+            dojo.html.set('title_'+jobId, endMessage );
+		  
+		  }
+		  
+		  // set the newLines variable for the next loop iteration
+		  newLines = newLines.substring( line.length + 1 )
+		  
+        }
+
+
+      },
+      error: function(e) {
+        dojo.html.set('title_'+jobId, "Error checking status... \n");
+      }
+    })
+  
+  }
+
+  function test()
+  {
+
+  }
+  function test2(){
+
+  }
+  function test3(){
+
+  }
+
+
+</script>
+
+
+
+
+
+  </head>
+ 
+  <body class="claro">
+
+    <div id="mainWindow" dojotype="dijit.layout.BorderContainer" design="headline" gutters="false" style="width:100%; height:100%;">
+
+		<div id="headerpane" dojotype="dijit.layout.ContentPane" region="top">
+
+		Automated Well Permitting Tool
+
+		</div>
+
+
+
+		<div id="bodypane"   dojotype="dijit.layout.ContentPane" region="center" style="font-size:smaller">
+
+			<div dojotype="dijit.layout.TabContainer" >
+
+				<div dojotype="dijit.layout.ContentPane" title = "Tool Input and Map View" selected="true" > 
+
+					<div dojotype="dijit.layout.BorderContainer" design="headline" gutters="false" style="width:100%; height:100%;">
+
+
+						<div dojotype="dijit.layout.ContentPane" id="leftPane" region="left" >
+
+
+							<div data-dojo-type="dijit.layout.ContentPane">
+
+								<div dojoType="dijit.TitlePane" title="Tool: Analyze Permit Application with MODFLOW" open=true>
+									<table style="width:100%">
+									<tr>
+									<td>
+									  <div dojoType="dojo.data.ItemFileReadStore" jsId="idStore" url="php/getApplicationIDList_json.php"></div>
+									  <label for="importWellsTxtbx"> Application ID: </label>
+									</td>
+									<td>
+									  <input dojoType="dijit.form.ComboBox" value="" store="idStore" searchAttr="id" 
+										 id="importWellsTxtbx" name="importWellsTxtbx" style="width:120px"
+										 onchange="importWellsFromDB()"  >
+									</td>
+									</tr>
+
+									</tr>
+									</table>
+
+									<div dojoType="dijit.TitlePane" title="  Output Options" open=false class="myTitlePane">
+										  <table style="width:100%">
+										   <tr>
+											<td align=center><input type="checkbox" dojoType="dijit.form.CheckBox" id="OutputWells" checked      ></td>
+											<td>New Wells</td>
+										   </tr>
+										   <tr>
+											<td align=center><input type="checkbox" dojoType="dijit.form.CheckBox" id="OutputDrawdown" checked    ></td>
+											<td>Drawdown Contours</td>
+										   </tr>
+										   <tr>
+											<td align=center><input type="checkbox" dojoType="dijit.form.CheckBox" id="OutputDrainPoints" checked ></td>
+											<td>Change in Spring Flows</td>
+										   </tr>
+										   <tr>
+											<td align=center><input type="checkbox" dojoType="dijit.form.CheckBox" id="OutputDrainAreas"   ></td>
+											<td>Total Change in Spring Flows</td>
+										   </tr>
+										   <tr>
+											<td align=center><input type="checkbox" dojoType="dijit.form.CheckBox" id="OutputReport" checked ></td>
+											<td>PDF Report </td>
+										   </tr>
+										   <tr>
+											<td align=center><br/></td>
+											<td></td>
+										   </tr>
+										   <tr>
+											<td align=center><input dojoType="dijit.form.TextBox" value="0.1" id="contourInterval_1" name="contourInterval_1" style="width:50px" required="true"></td>
+											<td>Drawdown Contour Interval (ft)</td>
+										   </tr>
+										  </table>
+
+									</div>
+
+									<center>
+										<button dojoType="dijit.form.Button" type="submit" onclick="runTool()" >Submit</button> <br/>
+										<!--
+										<button dojoType="dijit.form.Button" type="submit" onclick="loadLPrevResults('Results from Previous Simulation', messagesUrl)" style="font-size:smaller">Load Previous Results</button>
+										<button dojoType="dijit.form.Button" type="submit" onclick="loadLPrevResults('Saved Results for Demonstration', 'Sample Output/messages.txt')" style="font-size:smaller">Load Saved Results</button>
+										//-->
+									</center>
+
+								</div>
+								
+								<br/>
+								
+								<div dojoType="dijit.TitlePane" title="Tool Results" id="ResultsPane" open=false class="myTitlePane"> <!-- Elements will be added to this div for each GP Job submitted -->
+								  <div id="ResultLayersDIV_Anchor" style="">
+								  </div>
+								</div>
+
+								<div dojoType="dijit.TitlePane" title="N. Utah County MODFLOW Model" open=false class="myTitlePane">
+								
+									<select id="MOD_k" name="MOD_k" dojoType="dijit.form.Select"  style="width:150px;" onchange="updateLayerVisabilityMOD()" value=''>
+										<option value="1" > Layer 1 </option>
+										<option value="2" > Layer 2 </option>
+										<option value="3" > Layer 3 </option>
+										<option value="4" > Layer 4 </option>
+										<option value="All" selected="selected" > All Layers </option>
+									</select>
+									
+									<br/>
+									<table cellspacing=0 cellpadding=0>
+										<tbody>
+											
+											<tr>
+												
+												<td colspan=2>
+													<div dojoType="dijit.TitlePane" title="Grid Geometry" open=false class="myTitlePane">
+														<table cellspacing=0 cellpadding=0>
+															<tbody>
+																<tr>
+																	<td style="vertical-align:top; padding-top:3px">
+																		<input type="checkbox" dojoType="dijit.form.CheckBox" id="MOD_bound" onclick="updateLayerVisabilityMOD()" >
+																	</td>
+																	<td style="vertical-align:top; width:100%">
+																		<div dojoType="dijit.TitlePane" title="Model Boundry" open=false class="myTitlePane">
+																			<img src="../kml/MODFLOW/Active/borderLegend.jpg" width=100/>
+																		</div>
+																	</td>
+																</tr>
+																<tr>
+																	<td style="vertical-align:top; padding-top:3px">
+																		<input type="checkbox" dojoType="dijit.form.CheckBox" id="MOD_grid" onclick="updateLayerVisabilityMOD()" >
+																	</td>
+																	<td style="vertical-align:top; width:100%">
+																		<div dojoType="dijit.TitlePane" title="Active Grid with Elevation Data (Polygon Features)" open=false class="myTitlePane">
+																			<div id="gridSlider" dojoType="dijit.form.HorizontalSlider" 
+																				 value="1" minimum="0" maximum="1" intermediateChanges="true" 
+																				 style="width:200px;" onchange="updateOpacityMOD()">
+																			</div>	
+																			<img src="../kml/MODFLOW/Active/legend.png" />
+																		</div>
+																	</td>
+																</tr>
+																<tr>
+																	<td style="vertical-align:top; padding-top:3px">
+																		<input type="checkbox" dojoType="dijit.form.CheckBox" id="MOD_grid2" onclick="updateLayerVisabilityMOD()" >
+																	</td>
+																	<td style="vertical-align:top; width:100%">
+																		<div dojoType="dijit.TitlePane" title="Active Grid (Image Overaly)" open=false class="myTitlePane">
+																			<div id="grid2Slider" dojoType="dijit.form.HorizontalSlider" 
+																				 value="1" minimum="0" maximum="1" intermediateChanges="true" 
+																				 style="width:200px;" onchange="updateOpacityMOD()">
+																			</div>	
+																			<img src="../kml/MODFLOW/Active/legend.png" />
+																		</div>
+																	</td>
+																</tr>
+															</tbody>
+														</table>
+													</div>
+												</td>
+											</tr>
+											<tr>
+												
+												<td colspan=2>
+													<div dojoType="dijit.TitlePane" title="Hydraulic Conductivity" open=false class="myTitlePane">
+														<table cellspacing=0 cellpadding=0>
+															<tbody>
+																<tr>
+																	<td style="vertical-align:top; padding-top:3px">
+																		<input type="checkbox" dojoType="dijit.form.CheckBox" id="MOD_hk" onclick="updateLayerVisabilityMOD()" >
+																	</td>
+																	<td style="vertical-align:top; width:100%">
+																		<div dojoType="dijit.TitlePane" title="Horizontal Conductivity" open=false class="myTitlePane">
+																			<div id="hkSlider" dojoType="dijit.form.HorizontalSlider" 
+																				 value="1" minimum="0" maximum="1" intermediateChanges="true" 
+																				 style="width:200px;" onchange="updateOpacityMOD()">
+																			</div>	
+																			<br/>
+																			<img src="../kml/MODFLOW/HK/legend.jpg" height=250/>
+																		</div>
+																	</td>
+																</tr>
+																<tr>
+																	<td style="vertical-align:top; padding-top:3px">
+																		<input type="checkbox" dojoType="dijit.form.CheckBox" id="MOD_kv" onclick="updateLayerVisabilityMOD()" >
+																	</td>
+																	<td style="vertical-align:top; width:100%">
+																		<div dojoType="dijit.TitlePane" title="Vertical Conductivity (Upper Interface)" open=false class="myTitlePane">
+																			<div id="kvSlider" dojoType="dijit.form.HorizontalSlider" 
+																				 value="1" minimum="0" maximum="1" intermediateChanges="true" 
+																				 style="width:200px;" onchange="updateOpacityMOD()">
+																			</div>	
+																			<br/>
+																			<img src="../kml/MODFLOW/HK/legend.jpg" height=250/>
+																		</div>
+																	</td>
+																</tr>
+															</tbody>
+														</table>
+													</div>
+												</td>
+											</tr>
+																
+											<tr>
+												
+												<td colspan=2>
+													<div dojoType="dijit.TitlePane" title="Baseline Conditions and Flows" open=false class="myTitlePane">
+														<table cellspacing=0 cellpadding=0>
+															<tbody>
+																<tr>
+																	<td style="vertical-align:top; padding-top:3px">
+																		<input type="checkbox" dojoType="dijit.form.CheckBox" id="MOD_startingHead" onclick="updateLayerVisabilityMOD()">
+																	</td>
+																	<td style="vertical-align:top; width:100%">
+																		<div dojoType="dijit.TitlePane" title="Baseline Head" open=false class="myTitlePane">
+																			<div id="startingHeadSlider" dojoType="dijit.form.HorizontalSlider" 
+																				 value="1" minimum="0" maximum="1" intermediateChanges="true" 
+																				 style="width:200px;" onchange="updateOpacityMOD()">
+																			</div>	
+																			
+																			<img src="../kml/MODFLOW/Starting Head/strt_legend.png" />
+																		</div>
+																	</td>
+																</tr>
+																<tr>
+																	<td style="vertical-align:top; padding-top:3px">
+																		<input type="checkbox" dojoType="dijit.form.CheckBox" id="MOD_drains" onclick="updateLayerVisabilityMOD()" >
+																	</td>
+																	<td style="vertical-align:top; width:100%">
+																		<div dojoType="dijit.TitlePane" title="Drain Flows" open=false class="myTitlePane">
+																			<img src="../kml/MODFLOW/Drains/legend.png" />
+																		</div>
+																	</td>
+																</tr>
+																<tr>
+																	<td style="vertical-align:top; padding-top:3px">
+																		<input type="checkbox" dojoType="dijit.form.CheckBox" id="MOD_et" onclick="updateLayerVisabilityMOD()" >
+																	</td>
+																	<td style="vertical-align:top; width:100%">
+																		<div dojoType="dijit.TitlePane" title="Evapotranspiration Flows" open=false class="myTitlePane">
+																			<img src="../kml/MODFLOW/ET/legend.png" />
+																		</div>
+																	</td>
+																</tr>
+																<tr>
+																	<td style="vertical-align:top; padding-top:3px">
+																		<input type="checkbox" dojoType="dijit.form.CheckBox" id="MOD_streams" onclick="updateLayerVisabilityMOD()" >
+																	</td>
+																	<td style="vertical-align:top; width:100%">
+																		<div dojoType="dijit.TitlePane" title="Stream Flows" open=false class="myTitlePane">
+																			<img src="../kml/MODFLOW/Streams/streams_legend.png" />
+																		</div>
+																	</td>
+																</tr>
+																<tr>
+																	<td style="vertical-align:top; padding-top:3px">
+																		<input type="checkbox" dojoType="dijit.form.CheckBox" id="MOD_gh" onclick="updateLayerVisabilityMOD()" >
+																	</td>
+																	<td style="vertical-align:top; width:100%">
+																		<div dojoType="dijit.TitlePane" title="General Head Flows" open=false class="myTitlePane">
+																			<img src="../kml/MODFLOW/General Head/legend.png" />
+																		</div>
+																	</td>
+																</tr>
+																<tr>
+																	<td style="vertical-align:top; padding-top:3px">
+																		<input type="checkbox" dojoType="dijit.form.CheckBox" id="MOD_ch" onclick="updateLayerVisabilityMOD()" >
+																	</td>
+																	<td style="vertical-align:top; width:100%">
+																		<div dojoType="dijit.TitlePane" title="Constant Head Flows" open=false class="myTitlePane">
+																			<img src="../kml/MODFLOW/Constant Head/legend.png" />
+																		</div>
+																	</td>
+																</tr>
+															</tbody>
+														</table>
+													</div>
+													
+													<div dojoType="dijit.TitlePane" title="Static Model Properties" open=false class="myTitlePane">
+														<table cellspacing=0 cellpadding=0>
+															<tbody>
+															
+																<tr>
+																	<td style="vertical-align:top; padding-top:3px">
+																		<input type="checkbox" dojoType="dijit.form.CheckBox" id="MOD_wells" onclick="updateLayerVisabilityMOD()" >
+																	</td>
+																	<td style="vertical-align:top; width:100%">
+																		<div dojoType="dijit.TitlePane" title="Wells" open=false class="myTitlePane">
+																			<img src="../kml/MODFLOW/Wells/legend.jpg" />
+																		</div>
+																	</td>
+																</tr>
+															
+																<tr>
+																	<td style="vertical-align:top; padding-top:3px">
+																		<input type="checkbox" dojoType="dijit.form.CheckBox" id="MOD_drainCond" onclick="updateLayerVisabilityMOD()">
+																	</td>
+																	<td style="vertical-align:top; width:100%">
+																		<div dojoType="dijit.TitlePane" title="Drain Conductance" open=false class="myTitlePane">
+																		
+																			<img src="../kml/MODFLOW/Drains/drainCondLegend.png" />
+																		</div>
+																	</td>
+																</tr>
+																
+																<tr>
+																	<td style="vertical-align:top; padding-top:3px">
+																		<input type="checkbox" dojoType="dijit.form.CheckBox" id="MOD_recharge" onclick="updateLayerVisabilityMOD()">
+																	</td>
+																	<td style="vertical-align:top; width:100%">
+																		<div dojoType="dijit.TitlePane" title="Recharge Flows" open=false class="myTitlePane">
+																			<img src="../kml/MODFLOW/Recharge/legend.png" />
+																		</div>
+																	</td>
+																</tr>
+																
+															</tbody>
+														</table>
+													</div>
+												</td>
+											</tr>
+										</tbody>
+									</table>
+								</div>
+								
+								<div dojoType="dijit.TitlePane" title="Database Well Table" open=false class="myTitlePane">
+									<table cellspacing=0 cellpadding=0>
+										<tbody>
+											<tr>
+												<td style="vertical-align:top; padding-top:3px">
+													<input type="checkbox" dojoType="dijit.form.CheckBox" id="wpt_id"  onclick="updateLayerVisabilityMOD()" checked>
+												</td>
+												<td style="vertical-align:top; width:100%">
+													<div dojoType="dijit.TitlePane" title="Wells with <i>Entered</i> Application ID" open=false class="myTitlePane">
+														<img src="../kml/Other Legends/x.png" />
+													</div>
+												</td>
+											</tr>
+											<tr>
+												<td style="vertical-align:top; padding-top:3px">
+													<input type="checkbox" dojoType="dijit.form.CheckBox" id="wpt_all" onclick="refreshDBWellsKML()" >
+												</td>
+												<td style="vertical-align:top; width:100%">
+													<div dojoType="dijit.TitlePane" title="All Database Wells" open=false class="myTitlePane">
+														<img src="../kml/Other Legends/x.png" />
+													</div>
+												</td>
+											</tr>
+										</tbody>
+									</table>
+								</div>
+
+								<div dojoType="dijit.TitlePane" title="Divison of Water Rights" open=false class="myTitlePane">
+									<table cellspacing=0 cellpadding=0>
+										<tbody>
+											<tr>
+												<td style="vertical-align:top; padding-top:3px">
+													<input type="checkbox" dojoType="dijit.form.CheckBox" id="UDWR_areas" onclick="updateLayerVis()" >
+												</td>
+												<td style="vertical-align:top; width:100%">
+													<div dojoType="dijit.TitlePane" title="Water Right Areas" open=false class="myTitlePane">
+														<img src="../kml/DWR Layers/wra_legend.png" /><br/>
+														From <a href="http://www.waterrights.utah.gov/">www.waterrights.utah.gov</a>
+													</div>
+												</td>
+											</tr>
+											<tr>
+												<td style="vertical-align:top; padding-top:3px">
+													<input type="checkbox" dojoType="dijit.form.CheckBox" id="UDWR_pls" onclick="updateLayerVis()"   >
+												</td>
+												<td style="vertical-align:top; width:100%">
+													<div dojoType="dijit.TitlePane" title="Public Land Survey" open=false class="myTitlePane">
+														<img src="../kml/DWR Layers/pls_legend.png" /><br/>
+														From <a href="http://www.waterrights.utah.gov/">www.waterrights.utah.gov</a>
+													</div>
+												</td>
+											</tr>
+											<tr>
+												<td style="vertical-align:top; padding-top:3px">
+													<input type="checkbox" dojoType="dijit.form.CheckBox" id="UDWR_pod" onclick="updateLayerVis()"   >
+												</td>
+												<td style="vertical-align:top; width:100%">
+													<div dojoType="dijit.TitlePane" title="Points of Diversion" open=false class="myTitlePane">
+														<img src="../kml/DWR Layers/pod_legend.png" /><br/>
+														From <a href="http://www.waterrights.utah.gov/">www.waterrights.utah.gov</a>
+													</div>
+												</td>
+											</tr>
+										</tbody>
+									</table>
+								</div>
+								
+								<div dojoType="dijit.TitlePane" title="Roads and Cities" open=false class="myTitlePane">
+									<table cellspacing=0 cellpadding=0>
+										<tbody>
+											<tr>
+												<td style="vertical-align:top; padding-top:3px">
+													<input type="checkbox" dojoType="dijit.form.CheckBox" id="GE_borders" onclick="updateLayerVisabilityGE()">
+												</td>
+												<td style="vertical-align:top; width:100%">
+													<div dojoType="dijit.TitlePane" title="Borders and Labels" open=false class="myTitlePane">
+														<img src="../kml/Other Legends/BordersLabels.png" />
+													</div>
+												</td>
+											</tr>
+											<tr>
+												<td style="vertical-align:top; padding-top:3px">
+													<input type="checkbox" dojoType="dijit.form.CheckBox" id="GE_roads" onclick="updateLayerVisabilityGE()">
+												</td>
+												<td style="vertical-align:top; width:100%">
+													<div dojoType="dijit.TitlePane" title="Roads" open=false class="myTitlePane">
+														<img src="../kml/Other Legends/Roads.png" />
+													</div>
+												</td>
+											</tr>
+										</tbody>
+									</table>
+								</div>
+
+								<div dojoType="dijit.TitlePane" title="Map Options and Components" open=false class="myTitlePane">
+								  <input type="checkbox" dojoType="dijit.form.CheckBox" id="GE_elev" onclick="updateLayerVisabilityGE()" checked> 3D Elevation <br/>
+								  <input type="checkbox" dojoType="dijit.form.CheckBox" id="GE_nav" onclick="updateLayerVisabilityGE()" checked> Navigation <br/>
+								  <input type="checkbox" dojoType="dijit.form.CheckBox" id="GE_status" onclick="updateLayerVisabilityGE()" checked> Status Bar <br/>
+								  <input type="checkbox" dojoType="dijit.form.CheckBox" id="GE_time" onclick="updateLayerVisabilityGE()" > Historical Imagery <br/>
+								  <input type="checkbox" dojoType="dijit.form.CheckBox" id="GE_scale" onclick="updateLayerVisabilityGE()" > Scale <br/>
+								</div>
+
+							</div>
+
+						</div>
+
+						<div id="map3d" dojotype="dijit.layout.ContentPane" region="center">
+						</div>
+
+					</div>
+
+				</div>
+
+				<div dojotype="dijit.layout.ContentPane" title = "Table of Well Applications" >
+
+					<br/>
+					<table id="table_databaseWells">
+						<!-- This table is populated with JavaScript -->
+						<tbody id="tbody_databaseWells">
+						</tbody>
+					</table>
+
+				</div>
+
+				<div id="documentation" dojotype="dijit.layout.ContentPane" title = "Documentation" href="../app2/documentation.htm" >
+
+					<!-- Dojo should write over anything inside this div, but if it fails there will be a link to the same content -->
+					<a href="../app2/documentation.htm">documentation.htm</a>
+
+				</div>
+
+
+
+			</div>
+		</div>
+
+	</div>
+
+
+
+
+
+	<!--
+
+	Dialog box for editing database table
+
+	-->
+	<div dojoType="dijit.Dialog" id="editRowDialog" title="Edit Row Dialog" execute="submitEdits(dojo.toJson(arguments[0], true));">
+		<table>
+			<tr>
+				<td><label for="name">Well ID:</label></td>
+				<td> <input dojoType="dijit.form.TextBox" type="text" name="Well_ID" id="edit_WellID" disabled="disabled"></td>
+			</tr>
+			<tr>
+				<td><label for="name">Application ID:</label></td>
+				<td><input dojoType="dijit.form.TextBox" type="text" name="ApplicationID" id="edit_ApplicationID"></td>
+			</tr>
+			<tr>
+				<td><label for="name">Latitude:</label></td>
+				<td><input dojoType="dijit.form.TextBox" type="text" name="Latitude" id="edit_Latitude"></td>
+			</tr>
+			<tr>
+				<td><label for="loc">Longitude:</label></td>
+				<td><input dojoType="dijit.form.TextBox" type="text" name="Longitude" id="edit_Longitude"></td>
+			</tr>
+			<tr>
+				<td><label for="date">Flow (cfd):</label></td>
+				<td><input dojoType="dijit.form.TextBox" type="text" name="Flow_cfd" id="edit_Flow"></td>
+			</tr>
+			<tr>
+				<td><label for="date">Screen Top Elevation:</label></td>
+				<td><input dojoType="dijit.form.TextBox" type="text" name="ScreenTopElev_ft" id="edit_ScreenTop"></td>
+			</tr>
+			<tr>
+				<td><label for="date">Screen Bottom Elevation:</label></td>
+				<td><input dojoType="dijit.form.TextBox" type="text" name="ScreenBotmElev_ft" id="edit_ScreenBotm"></td>
+			</tr>
+
+			<tr>
+				<td align="center" colspan="2">
+					<button dojoType="dijit.form.Button" type="submit" onClick="return dijit.byId('editRowDialog').isValid();">
+						OK
+					</button>
+					<button dojoType="dijit.form.Button" type="button" onClick="dijit.byId('editRowDialog').hide();">
+						Cancel
+					</button>
+				</td>
+			</tr>
+		</table>
+	</div>
+
+
+
+
+
+
+  </body>
+
+</html> 
